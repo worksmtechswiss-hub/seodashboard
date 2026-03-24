@@ -1,9 +1,17 @@
 import { Search, Calendar, ChevronDown, Bell, Settings } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { T } from '../../utils/constants'
 import { useAppStore } from '../../store/app-store'
+import { checkAuthStatus, redirectToLogin } from '../../utils/auth'
 
 export function TopBar() {
   const { searchQuery, setSearchQuery } = useAppStore()
+  const { data: authenticated = false } = useQuery({
+    queryKey: ['auth-status'],
+    queryFn: checkAuthStatus,
+    staleTime: 60_000,
+    retry: false,
+  })
 
   return (
     <div style={{
@@ -63,6 +71,19 @@ export function TopBar() {
         }}>
           <Settings size={16} color={T.text.secondary} />
         </button>
+        {!authenticated && (
+          <button
+            onClick={redirectToLogin}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 10,
+              background: `linear-gradient(135deg, ${T.accent.indigo}, ${T.accent.purple})`,
+              border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Connect Google
+          </button>
+        )}
         <div style={{
           width: 38, height: 38, borderRadius: 10,
           background: `linear-gradient(135deg, ${T.accent.indigo}, ${T.accent.purple})`,
