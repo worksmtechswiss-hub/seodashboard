@@ -6,6 +6,34 @@ import { formatNum } from '../../utils/formatters'
 import { websites } from '../../utils/mock-data'
 import { useAppStore } from '../../store/app-store'
 
+function SortHeader({ field, children, sortBy, sortDir, onSort }) {
+  return (
+    <th
+      onClick={() => onSort(field)}
+      style={{
+        padding: '12px 14px', fontSize: 11, fontWeight: 600,
+        color: sortBy === field ? T.accent.indigo : T.text.muted,
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+        cursor: 'pointer', textAlign: 'right', userSelect: 'none',
+        borderBottom: `1px solid ${T.border.subtle}`,
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {children}
+        {sortBy === field && (
+          <ChevronDown
+            size={12}
+            style={{
+              transform: sortDir === 'asc' ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.2s',
+            }}
+          />
+        )}
+      </span>
+    </th>
+  )
+}
+
 export function WebsitesView() {
   const { searchQuery } = useAppStore()
   const [sortBy, setSortBy] = useState("clicks")
@@ -21,15 +49,6 @@ export function WebsitesView() {
     if (sortBy === field) setSortDir(d => d === "desc" ? "asc" : "desc")
     else { setSortBy(field); setSortDir("desc") }
   }
-
-  const SortHeader = ({ field, children }) => (
-    <th onClick={() => toggleSort(field)} style={{ padding: "12px 14px", fontSize: 11, fontWeight: 600, color: sortBy === field ? T.accent.indigo : T.text.muted, textTransform: "uppercase", letterSpacing: "0.06em", cursor: "pointer", textAlign: "right", userSelect: "none", borderBottom: `1px solid ${T.border.subtle}` }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-        {children}
-        {sortBy === field && <ChevronDown size={12} style={{ transform: sortDir === "asc" ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />}
-      </span>
-    </th>
-  )
 
   return (
     <GlassCard style={{ padding: 0, overflow: "hidden" }}>
@@ -49,12 +68,12 @@ export function WebsitesView() {
           <thead>
             <tr>
               <th style={{ padding: "12px 14px 12px 24px", fontSize: 11, fontWeight: 600, color: T.text.muted, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", borderBottom: `1px solid ${T.border.subtle}` }}>Website</th>
-              <SortHeader field="clicks">Clicks</SortHeader>
-              <SortHeader field="impressions">Impressions</SortHeader>
-              <SortHeader field="ctr">CTR</SortHeader>
-              <SortHeader field="position">Position</SortHeader>
-              <SortHeader field="forms">Leads</SortHeader>
-              <SortHeader field="health">Health</SortHeader>
+              <SortHeader field="clicks" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Clicks</SortHeader>
+              <SortHeader field="impressions" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Impressions</SortHeader>
+              <SortHeader field="ctr" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>CTR</SortHeader>
+              <SortHeader field="position" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Position</SortHeader>
+              <SortHeader field="forms" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Leads</SortHeader>
+              <SortHeader field="health" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort}>Health</SortHeader>
               <th style={{ padding: "12px 14px", fontSize: 11, fontWeight: 600, color: T.text.muted, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "center", borderBottom: `1px solid ${T.border.subtle}` }}>Status</th>
             </tr>
           </thead>
