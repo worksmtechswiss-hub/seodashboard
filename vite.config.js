@@ -9,5 +9,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test-setup.js'],
     passWithNoTests: true,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**'],
+      exclude: ['src/test-setup.js'],
+    },
   },
 })
