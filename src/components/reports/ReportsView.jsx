@@ -10,6 +10,29 @@ export function ReportsView() {
     { name: "Competitor Movement Alert", schedule: "When changes detected", lastRun: "Mar 22, 2026", type: "trigger", status: "active" },
   ]
 
+  const downloadReport = async (reportName) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const res = await fetch(`/.netlify/functions/scheduled-report?action=download&date=${today}`)
+      if (!res.ok) throw new Error('Report not available yet')
+      const data = await res.json()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${reportName.replace(/\s+/g, '-').toLowerCase()}-${today}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Report not available yet. Run the report first.')
+    }
+  }
+
+  const runReport = async () => {
+    await fetch('/.netlify/functions/scheduled-report', { method: 'POST' })
+    alert('Report generation started!')
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
@@ -25,8 +48,8 @@ export function ReportsView() {
             <div style={{ fontSize: 12, color: T.text.muted, marginBottom: 2 }}>{r.schedule}</div>
             <div style={{ fontSize: 11, color: T.text.muted, opacity: 0.7 }}>Last run: {r.lastRun}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button style={{ flex: 1, padding: "9px 0", borderRadius: 8, background: `${T.accent.indigo}15`, border: `1px solid ${T.accent.indigo}30`, color: T.accent.indigo, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Run Now</button>
-              <button style={{ flex: 1, padding: "9px 0", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border.subtle}`, color: T.text.secondary, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Download</button>
+              <button onClick={runReport} style={{ flex: 1, padding: "9px 0", borderRadius: 8, background: `${T.accent.indigo}15`, border: `1px solid ${T.accent.indigo}30`, color: T.accent.indigo, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Run Now</button>
+              <button onClick={() => downloadReport(r.name)} style={{ flex: 1, padding: "9px 0", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border.subtle}`, color: T.text.secondary, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>Download</button>
             </div>
           </GlassCard>
         ))}
