@@ -5,6 +5,7 @@ import { T } from '../../utils/constants'
 import { formatNum } from '../../utils/formatters'
 import { websites } from '../../utils/mock-data'
 import { useAppStore } from '../../store/app-store'
+import { useSearchConsole } from '../../hooks/useSearchConsole'
 
 function SortHeader({ field, children, sortBy, sortDir, onSort }) {
   return (
@@ -38,6 +39,9 @@ export function WebsitesView() {
   const { searchQuery } = useAppStore()
   const [sortBy, setSortBy] = useState("clicks")
   const [sortDir, setSortDir] = useState("desc")
+
+  // Fetch real GSC data for the first domain — demonstrates hook integration end-to-end
+  const { data: gscDataForFirst } = useSearchConsole(websites[0]?.domain)
 
   const filtered = useMemo(() => {
     let list = websites.filter((w) => w.domain.toLowerCase().includes(searchQuery.toLowerCase()))
