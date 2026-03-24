@@ -1,5 +1,18 @@
 import { getStore } from '@netlify/blobs'
-import { createOAuth2Client, AUTH_SCOPES } from './_utils/google.js'
+import { OAuth2Client } from 'google-auth-library'
+
+const SCOPES = [
+  'https://www.googleapis.com/auth/webmasters.readonly',
+  'https://www.googleapis.com/auth/analytics.readonly',
+]
+
+function createClient() {
+  return new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  )
+}
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -12,10 +25,10 @@ export const handler = async (event) => {
 
   // ── Login: generate Google OAuth URL ─────────────────────────────
   if (action === 'login') {
-    const client = createOAuth2Client()
+    const client = createClient()
     const redirectUrl = client.generateAuthUrl({
       access_type: 'offline',
-      scope: AUTH_SCOPES,
+      scope: SCOPES,
       state: 'seo-dashboard',
       prompt: 'consent',
     })
@@ -32,7 +45,7 @@ export const handler = async (event) => {
   // ── Callback: exchange code for tokens ───────────────────────────
   if (code) {
     try {
-      const client = createOAuth2Client()
+      const client = createClient()
       const { tokens } = await client.getToken(code)
       const authStore = getStore('auth')
       await authStore.set('tokens', JSON.stringify(tokens))

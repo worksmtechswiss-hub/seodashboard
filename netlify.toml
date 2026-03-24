@@ -4,8 +4,7 @@
   functions = "netlify/functions"
 
 [functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["@netlify/blobs", "googleapis", "google-auth-library"]
+  node_bundler = "nft"
 
 # No [[redirects]] needed — app uses hash routing (createHashRouter)
 
