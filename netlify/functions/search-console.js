@@ -1,6 +1,5 @@
 import { getStore, connectLambda } from '@netlify/blobs'
-import { google } from 'googleapis'
-import { getAuthenticatedClient } from './_utils/google.js'
+import { getAccessToken, googleFetch } from './_utils/google.js'
 import { getCached, setCached } from './_utils/cache.js'
 
 const GSC_TTL_MS = 3_600_000  // 1 hour
@@ -34,21 +33,24 @@ export const handler = async (event) => {
 
   // Fetch from GSC API
   try {
-    const { client } = await getAuthenticatedClient(storedTokens, authStore)
-    const webmasters = google.webmasters({ version: 'v3', auth: client })
+    const accessToken = await getAccessToken(storedTokens, authStore)
 
     const endDate = new Date().toISOString().slice(0, 10)
     const startDate = new Date(Date.now() - dateRange * 86_400_000).toISOString().slice(0, 10)
 
-    const { data } = await webmasters.searchanalytics.query({
-      siteUrl: `sc-domain:${domain}`,
-      requestBody: {
-        startDate,
-        endDate,
-        dimensions: ['date'],
-        rowLimit: dateRange,
-      },
-    })
+    const data = await googleFetch(
+      `https://www.googleapis.com/webmasters/v3/sites/sc-domain%3A${domain}/searchAnalytics/query`,
+      accessToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ['date'],
+          rowLimit: dateRange,
+        }),
+      }
+    )
 
     const rows = data.rows || []
     const totals = rows.reduce(

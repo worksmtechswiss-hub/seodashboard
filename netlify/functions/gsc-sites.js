@@ -1,6 +1,5 @@
 import { getStore, connectLambda } from '@netlify/blobs'
-import { google } from 'googleapis'
-import { getAuthenticatedClient } from './_utils/google.js'
+import { getAccessToken, googleFetch } from './_utils/google.js'
 import { getCached, setCached } from './_utils/cache.js'
 
 const SITES_TTL_MS = 3_600_000 // 1 hour
@@ -13,6 +12,7 @@ const json = (statusCode, body) => ({
 
 export const handler = async (event) => {
   connectLambda(event)
+
   // Check auth
   const authStore = getStore('auth')
   const storedTokens = await authStore.get('tokens', { type: 'json' }).catch(() => null)
@@ -26,23 +26,22 @@ export const handler = async (event) => {
   if (cached) return json(200, cached)
 
   try {
-    const { client } = await getAuthenticatedClient(storedTokens, authStore)
-    const webmasters = google.webmasters({ version: 'v3', auth: client })
+    const accessToken = await getAccessToken(storedTokens, authStore)
 
-    const { data } = await webmasters.sites.list()
+    const data = await googleFetch(
+      'https://www.googleapis.com/webmasters/v3/sites',
+      accessToken
+    )
+
     const siteEntries = data.siteEntry || []
 
-    // Parse GSC sites into a clean domain list
     const sites = siteEntries.map((entry) => {
       const raw = entry.siteUrl || ''
       let domain = raw
 
-      // sc-domain:example.com → example.com
       if (raw.startsWith('sc-domain:')) {
         domain = raw.replace('sc-domain:', '')
-      }
-      // https://example.com/ → example.com
-      else {
+      } else {
         domain = raw.replace(/^https?:\/\//, '').replace(/\/$/, '')
       }
 

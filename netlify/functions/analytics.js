@@ -1,6 +1,5 @@
 import { getStore, connectLambda } from '@netlify/blobs'
-import { google } from 'googleapis'
-import { getAuthenticatedClient } from './_utils/google.js'
+import { getAccessToken, googleFetch } from './_utils/google.js'
 import { getCached, setCached } from './_utils/cache.js'
 
 const GA4_TTL_MS = 14_400_000  // 4 hours
@@ -33,23 +32,26 @@ export const handler = async (event) => {
 
   // Fetch from GA4 API
   try {
-    const { client } = await getAuthenticatedClient(storedTokens, authStore)
-    const analyticsData = google.analyticsdata({ version: 'v1beta', auth: client })
+    const accessToken = await getAccessToken(storedTokens, authStore)
 
     const endDate = 'today'
     const startDate = `${dateRange}daysAgo`
 
-    const { data } = await analyticsData.properties.runReport({
-      property: propertyId,
-      requestBody: {
-        dateRanges: [{ startDate, endDate }],
-        metrics: [
-          { name: 'sessions' },
-          { name: 'screenPageViews' },
-          { name: 'bounceRate' },
-        ],
-      },
-    })
+    const data = await googleFetch(
+      `https://analyticsdata.googleapis.com/v1beta/${propertyId}:runReport`,
+      accessToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          dateRanges: [{ startDate, endDate }],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'screenPageViews' },
+            { name: 'bounceRate' },
+          ],
+        }),
+      }
+    )
 
     const row = data.rows?.[0]?.metricValues || []
     const result = {
