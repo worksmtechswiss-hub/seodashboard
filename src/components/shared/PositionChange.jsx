@@ -2,6 +2,7 @@ import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { T } from '../../utils/constants'
 
 export function PositionChange({ current, previous }) {
+  if (previous == null || current == null) return <span style={{ color: T.text.muted, fontSize: 12 }}>—</span>
   const diff = previous - current
   if (diff === 0) return <span style={{ color: T.text.muted, fontSize: 12 }}>—</span>
   return (
