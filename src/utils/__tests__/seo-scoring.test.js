@@ -21,6 +21,10 @@ describe('calculateHealthScore', () => {
   it('deducts 8 for medium page speed', () => {
     expect(calculateHealthScore({ pageSpeedMedium: true })).toBe(92)
   })
+  it('stacks pageSpeedLow and pageSpeedMedium deductions when both set', () => {
+    // Both set: 25 -15 -8 = 2 for performance category → score = 77
+    expect(calculateHealthScore({ pageSpeedLow: true, pageSpeedMedium: true })).toBe(77)
+  })
   it('returns 0 for a completely broken site', () => {
     expect(calculateHealthScore({
       missingDescription: true, badTitleLength: true, badDescLength: true,
