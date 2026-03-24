@@ -1,10 +1,12 @@
 import { Send, Clock, Users, CheckCircle, BarChart3, Globe, Mail } from 'lucide-react'
 import { BarChart, Bar, PieChart, Pie, Cell, Legend, Tooltip, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { T } from '../../utils/constants'
-import { formSubmissions, formsByDay, formsBySite } from '../../utils/mock-data'
+import { formsByDay, formsBySite } from '../../utils/mock-data'
+import { useFormspree } from '../../hooks/useFormspree'
 import { GlassCard, MetricCard, SectionHeader, Badge, ChartTooltip } from '../shared'
 
 export function FormsView() {
+  const { data: formSubmissions } = useFormspree()
   const statusVariant = { new: "default", contacted: "warning", converted: "success" }
   const COLORS = [T.accent.indigo, T.accent.blue, T.accent.cyan, T.accent.emerald, T.accent.amber, T.accent.purple]
 
