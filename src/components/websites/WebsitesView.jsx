@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react'
-import { Globe, Plus, Download, ChevronDown } from 'lucide-react'
+import { Globe, Plus, Download, ChevronDown, Loader2 } from 'lucide-react'
 import { GlassCard, SectionHeader, HealthBar, StatusDot } from '../shared'
 import { T } from '../../utils/constants'
 import { formatNum } from '../../utils/formatters'
-import { websites } from '../../utils/mock-data'
 import { useAppStore } from '../../store/app-store'
-import { useSearchConsole } from '../../hooks/useSearchConsole'
+import { useSiteList } from '../../hooks/useSiteList'
+import { useMultiDomainGSC } from '../../hooks/useMultiDomainGSC'
 
 function SortHeader({ field, children, sortBy, sortDir, onSort }) {
   return (
@@ -40,25 +40,51 @@ export function WebsitesView() {
   const [sortBy, setSortBy] = useState("clicks")
   const [sortDir, setSortDir] = useState("desc")
 
-  // Fetch real GSC data for the first domain — demonstrates hook integration end-to-end
-  const { data: gscDataForFirst } = useSearchConsole(websites[0]?.domain)
+  const { sites, domains, isLoading: sitesLoading, isAuthenticated } = useSiteList()
+  const { domains: domainResults, isLoading: gscLoading } = useMultiDomainGSC(domains)
+
+  // Build website list: merge site info with GSC data
+  const websiteList = useMemo(() => {
+    if (isAuthenticated) {
+      return sites.map((site) => {
+        const gsc = domainResults.find((d) => d.domain === site.domain)
+        return {
+          id: site.id,
+          domain: site.domain,
+          clicks: gsc?.data?.clicks ?? 0,
+          impressions: gsc?.data?.impressions ?? 0,
+          ctr: gsc?.data?.ctr ?? 0,
+          position: gsc?.data?.position ?? 0,
+          forms: 0,
+          health: gsc?.data ? Math.min(100, Math.round(100 - (gsc.data.position || 50) * 2)) : 0,
+          status: gsc?.isError ? 'critical' : gsc?.isLoading ? 'warning' : 'healthy',
+          lang: '',
+        }
+      })
+    }
+    // Fallback: mock data (has all fields including forms, health, lang)
+    return sites
+  }, [sites, domainResults, isAuthenticated])
 
   const filtered = useMemo(() => {
-    let list = websites.filter((w) => w.domain.toLowerCase().includes(searchQuery.toLowerCase()))
+    let list = websiteList.filter((w) => w.domain.toLowerCase().includes(searchQuery.toLowerCase()))
     list.sort((a, b) => sortDir === "desc" ? b[sortBy] - a[sortBy] : a[sortBy] - b[sortBy])
     return list
-  }, [searchQuery, sortBy, sortDir])
+  }, [websiteList, searchQuery, sortBy, sortDir])
 
   const toggleSort = (field) => {
     if (sortBy === field) setSortDir(d => d === "desc" ? "asc" : "desc")
     else { setSortBy(field); setSortDir("desc") }
   }
 
+  const isLoading = sitesLoading || gscLoading
+
   return (
     <GlassCard style={{ padding: 0, overflow: "hidden" }}>
       <div style={{ padding: "20px 24px", borderBottom: `1px solid ${T.border.subtle}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <SectionHeader icon={Globe} title="All Websites" subtitle={`${filtered.length} websites tracked`} />
-        <div style={{ display: "flex", gap: 8 }}>
+        <SectionHeader icon={Globe} title="All Websites" subtitle={`${filtered.length} websites tracked${isAuthenticated ? ' (GSC)' : ''}`} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {isLoading && <Loader2 size={16} color={T.accent.indigo} style={{ animation: 'spin 1s linear infinite' }} />}
           <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, background: `${T.accent.indigo}15`, border: `1px solid ${T.accent.indigo}30`, color: T.accent.indigo, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
             <Plus size={14} />Add Website
           </button>
@@ -83,7 +109,7 @@ export function WebsitesView() {
           </thead>
           <tbody>
             {filtered.map((site) => (
-              <tr key={site.id} style={{ borderBottom: `1px solid ${T.border.subtle}`, cursor: "pointer", transition: "background 0.15s" }}
+              <tr key={site.id ?? site.domain} style={{ borderBottom: `1px solid ${T.border.subtle}`, cursor: "pointer", transition: "background 0.15s" }}
                 onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
                 <td style={{ padding: "14px 14px 14px 24px" }}>
@@ -93,25 +119,20 @@ export function WebsitesView() {
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: T.text.primary }}>{site.domain}</div>
-                      <div style={{ fontSize: 11, color: T.text.muted, textTransform: "uppercase" }}>{site.lang}</div>
+                      {site.lang && <div style={{ fontSize: 11, color: T.text.muted, textTransform: "uppercase" }}>{site.lang}</div>}
                     </div>
                   </div>
                 </td>
-                {(() => {
-                  const live = site.domain === websites[0]?.domain ? gscDataForFirst : null
-                  return (<>
-                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, fontWeight: 600, color: T.text.primary }}>{formatNum(live?.clicks ?? site.clicks)}</td>
-                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.secondary }}>{formatNum(live?.impressions ?? site.impressions)}</td>
-                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.accent.emerald, fontWeight: 600 }}>{live?.ctr ?? site.ctr}%</td>
-                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.primary }}>{live?.position ?? site.position}</td>
-                  </>)
-                })()}
-                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.accent.amber, fontWeight: 600 }}>{site.forms}</td>
-                <td style={{ padding: "14px", width: 140 }}><HealthBar value={site.health} /></td>
+                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, fontWeight: 600, color: T.text.primary }}>{formatNum(site.clicks)}</td>
+                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.secondary }}>{formatNum(site.impressions)}</td>
+                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.accent.emerald, fontWeight: 600 }}>{site.ctr}%</td>
+                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.primary }}>{site.position}</td>
+                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.accent.amber, fontWeight: 600 }}>{site.forms ?? 0}</td>
+                <td style={{ padding: "14px", width: 140 }}><HealthBar value={site.health ?? 0} /></td>
                 <td style={{ padding: "14px", textAlign: "center" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                    <StatusDot status={site.status} />
-                    <span style={{ fontSize: 12, color: T.text.muted, textTransform: "capitalize" }}>{site.status}</span>
+                    <StatusDot status={site.status ?? 'healthy'} />
+                    <span style={{ fontSize: 12, color: T.text.muted, textTransform: "capitalize" }}>{site.status ?? 'healthy'}</span>
                   </div>
                 </td>
               </tr>

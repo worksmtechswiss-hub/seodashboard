@@ -27,6 +27,6 @@ export function useSearchConsole(domain, dateRange = 30) {
     gcTime: 300_000,
     retry: false,
     // If the query fails (unauthenticated / offline), return mock data as placeholder
-    placeholderData: mockSite ?? null,
+    placeholderData: mockSite ?? { domain, clicks: 0, impressions: 0, ctr: 0, position: 0, rows: [] },
   })
 }
