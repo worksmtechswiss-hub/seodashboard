@@ -1,18 +1,9 @@
 import { getStore } from '@netlify/blobs'
-import { OAuth2Client } from 'google-auth-library'
 
 const SCOPES = [
   'https://www.googleapis.com/auth/webmasters.readonly',
   'https://www.googleapis.com/auth/analytics.readonly',
 ]
-
-function createClient() {
-  return new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  )
-}
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -25,14 +16,16 @@ export const handler = async (event) => {
 
   // ── Login: generate Google OAuth URL ─────────────────────────────
   if (action === 'login') {
-    const client = createClient()
-    const redirectUrl = client.generateAuthUrl({
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+      response_type: 'code',
+      scope: SCOPES.join(' '),
       access_type: 'offline',
-      scope: SCOPES,
-      state: 'seo-dashboard',
       prompt: 'consent',
+      state: 'seo-dashboard',
     })
-    return json(200, { redirectUrl })
+    return json(200, { redirectUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}` })
   }
 
   // ── Status: check if tokens exist ────────────────────────────────
@@ -45,8 +38,23 @@ export const handler = async (event) => {
   // ── Callback: exchange code for tokens ───────────────────────────
   if (code) {
     try {
-      const client = createClient()
-      const { tokens } = await client.getToken(code)
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+          grant_type: 'authorization_code',
+        }).toString(),
+      })
+
+      const tokens = await tokenRes.json()
+      if (tokens.error) {
+        return json(400, { error: 'Token exchange failed', detail: tokens.error_description || tokens.error })
+      }
+
       const authStore = getStore('auth')
       await authStore.set('tokens', JSON.stringify(tokens))
       return {
