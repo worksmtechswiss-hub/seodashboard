@@ -97,10 +97,15 @@ export function WebsitesView() {
                     </div>
                   </div>
                 </td>
-                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, fontWeight: 600, color: T.text.primary }}>{formatNum(site.clicks)}</td>
-                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.secondary }}>{formatNum(site.impressions)}</td>
-                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.accent.emerald, fontWeight: 600 }}>{site.ctr}%</td>
-                <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.primary }}>{site.position}</td>
+                {(() => {
+                  const live = site.domain === websites[0]?.domain ? gscDataForFirst : null
+                  return (<>
+                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, fontWeight: 600, color: T.text.primary }}>{formatNum(live?.clicks ?? site.clicks)}</td>
+                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.secondary }}>{formatNum(live?.impressions ?? site.impressions)}</td>
+                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.accent.emerald, fontWeight: 600 }}>{live?.ctr ?? site.ctr}%</td>
+                    <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.text.primary }}>{live?.position ?? site.position}</td>
+                  </>)
+                })()}
                 <td style={{ padding: "14px", textAlign: "right", fontSize: 13, color: T.accent.amber, fontWeight: 600 }}>{site.forms}</td>
                 <td style={{ padding: "14px", width: 140 }}><HealthBar value={site.health} /></td>
                 <td style={{ padding: "14px", textAlign: "center" }}>

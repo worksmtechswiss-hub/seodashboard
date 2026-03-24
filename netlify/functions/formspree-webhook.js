@@ -11,7 +11,7 @@ export const handler = async (event) => {
 
   // ── GET: list all stored submissions ────────────────────────────
   if (event.httpMethod === 'GET') {
-    const { blobs } = await formsStore.list({ prefix: 'submissions/' })
+    const { blobs } = await formsStore.list({ prefix: 'forms/submissions/' })
     const submissions = await Promise.all(
       blobs.map((b) => formsStore.get(b.key, { type: 'json' }))
     )
