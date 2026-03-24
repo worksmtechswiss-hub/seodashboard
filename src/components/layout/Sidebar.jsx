@@ -57,7 +57,7 @@ export function Sidebar() {
       {/* Nav items */}
       <div style={{ padding: '12px 10px', flex: 1 }}>
         {navItems.map((item) => {
-          const active = location.pathname === item.path || (item.path === '/' && location.pathname === '/')
+          const active = location.pathname === item.path
           const Icon = ICONS[item.id]
           return (
             <button

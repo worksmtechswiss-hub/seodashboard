@@ -3,7 +3,7 @@ import { T, viewTitles } from '../../utils/constants'
 
 export function PageWrapper({ children }) {
   const location = useLocation()
-  const id = location.pathname.replace('/', '') || 'dashboard'
+  const id = location.pathname.slice(1).split('/')[0] || 'dashboard'
   const { title, subtitle } = viewTitles[id] ?? { title: id, subtitle: '' }
 
   return (
