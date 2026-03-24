@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs'
+import { getStore, connectLambda } from '@netlify/blobs'
 import { getAuthenticatedClient } from './_utils/google.js'
 
 const json = (statusCode, body) => ({
@@ -8,6 +8,7 @@ const json = (statusCode, body) => ({
 })
 
 export const handler = async (event, context) => {
+  connectLambda(event)
   const today = new Date().toISOString().slice(0, 10)
 
   // ── GET ?action=download: serve a stored report ───────────────────

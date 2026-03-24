@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs'
+import { getStore, connectLambda } from '@netlify/blobs'
 import { google } from 'googleapis'
 import { getAuthenticatedClient } from './_utils/google.js'
 import { getCached, setCached } from './_utils/cache.js'
@@ -12,6 +12,7 @@ const json = (statusCode, body) => ({
 })
 
 export const handler = async (event) => {
+  connectLambda(event)
   const { domain, dateRange = 30, invalidate = false } = JSON.parse(event.body || '{}')
 
   if (!domain) return json(400, { error: 'domain is required' })

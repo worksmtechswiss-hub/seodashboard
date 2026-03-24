@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs'
+import { getStore, connectLambda } from '@netlify/blobs'
 import { google } from 'googleapis'
 import { getAuthenticatedClient } from './_utils/google.js'
 import { getCached, setCached } from './_utils/cache.js'
@@ -12,6 +12,7 @@ const json = (statusCode, body) => ({
 })
 
 export const handler = async (event) => {
+  connectLambda(event)
   const { propertyId, dateRange = 30 } = JSON.parse(event.body || '{}')
 
   if (!propertyId) return json(400, { error: 'propertyId is required' })

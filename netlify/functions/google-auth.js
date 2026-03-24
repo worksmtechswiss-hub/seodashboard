@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs'
+import { getStore, connectLambda } from '@netlify/blobs'
 
 const SCOPES = [
   'https://www.googleapis.com/auth/webmasters.readonly',
@@ -12,6 +12,7 @@ const json = (statusCode, body) => ({
 })
 
 export const handler = async (event) => {
+  connectLambda(event)
   const { action, code } = event.queryStringParameters || {}
 
   // ── Login: generate Google OAuth URL ─────────────────────────────

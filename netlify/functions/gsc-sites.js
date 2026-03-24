@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs'
+import { getStore, connectLambda } from '@netlify/blobs'
 import { google } from 'googleapis'
 import { getAuthenticatedClient } from './_utils/google.js'
 import { getCached, setCached } from './_utils/cache.js'
@@ -11,7 +11,8 @@ const json = (statusCode, body) => ({
   body: JSON.stringify(body),
 })
 
-export const handler = async () => {
+export const handler = async (event) => {
+  connectLambda(event)
   // Check auth
   const authStore = getStore('auth')
   const storedTokens = await authStore.get('tokens', { type: 'json' }).catch(() => null)

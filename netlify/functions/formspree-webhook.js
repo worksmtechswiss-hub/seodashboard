@@ -1,4 +1,4 @@
-import { getStore } from '@netlify/blobs'
+import { getStore, connectLambda } from '@netlify/blobs'
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -7,6 +7,7 @@ const json = (statusCode, body) => ({
 })
 
 export const handler = async (event) => {
+  connectLambda(event)
   const formsStore = getStore('forms')
 
   // ── GET: list all stored submissions ────────────────────────────
