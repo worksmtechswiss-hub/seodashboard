@@ -1,0 +1,30 @@
+{
+  "name": "seo-command-center",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.95.2",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^1.0.1",
+    "react-router-dom": "^7.13.2",
+    "recharts": "^3.8.0",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.1.1",
+    "jsdom": "^29.0.1",
+    "vite": "^5.4.11",
+    "vitest": "^4.1.1"
+  }
+}
