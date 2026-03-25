@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { MousePointerClick, Eye, TrendingUp, Target, Send, Shield, Trophy, Tag } from 'lucide-react'
+import { MousePointerClick, Eye, TrendingUp, Target, Send, Shield, Trophy, Tag, ChevronDown } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { T } from '../../utils/constants'
 import { formatNum } from '../../utils/formatters'
@@ -19,6 +19,7 @@ const performerFilters = [
 
 export function DashboardView() {
   const [performerDays, setPerformerDays] = useState(7)
+  const [expandedDay, setExpandedDay] = useState(null)
   const dateRange = useAppStore((s) => s.dateRange)
   const activeBusinessFilter = useAppStore((s) => s.activeBusinessFilter)
   const setActiveBusinessFilter = useAppStore((s) => s.setActiveBusinessFilter)
@@ -51,11 +52,10 @@ export function DashboardView() {
     ? mergedRows.map((r) => ({ date: r.date, value: r.impressions }))
     : mockImpressionsData.slice(-dateRange)
 
-  // Compute daily top performers (which site had the most clicks/impressions each day)
+  // Compute daily top performers — top 10 websites per day ranked by clicks & impressions
   const topPerformers = (() => {
     const hasRealDomainData = domainResults.some((d) => d.data?.rows?.length > 0)
     if (hasRealDomainData) {
-      // Build a map: date → [{ domain, clicks, impressions }]
       const byDate = {}
       for (const dr of domainResults) {
         if (!dr.data?.rows) continue
@@ -68,26 +68,22 @@ export function DashboardView() {
       return Object.entries(byDate)
         .sort(([a], [b]) => b.localeCompare(a))
         .slice(0, performerDays)
-        .map(([date, entries]) => {
-          const topClicks = entries.reduce((best, e) => (e.clicks > best.clicks ? e : best), entries[0])
-          const topImpressions = entries.reduce((best, e) => (e.impressions > best.impressions ? e : best), entries[0])
-          return {
-            date,
-            displayDate: new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
-            topClicks: { domain: topClicks.domain, value: topClicks.clicks },
-            topImpressions: { domain: topImpressions.domain, value: topImpressions.impressions },
-          }
-        })
+        .map(([date, entries]) => ({
+          date,
+          displayDate: new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
+          byClicks: [...entries].sort((a, b) => b.clicks - a.clicks).slice(0, 10),
+          byImpressions: [...entries].sort((a, b) => b.impressions - a.impressions).slice(0, 10),
+        }))
     }
-    // Mock fallback: generate fake daily top performers from mock websites
+    // Mock fallback
     return Array.from({ length: performerDays }, (_, i) => {
       const d = new Date(Date.now() - i * 86400000)
-      const shuffled = [...mockWebsites].sort(() => Math.random() - 0.5)
+      const shuffled = [...mockWebsites].sort(() => Math.random() - 0.5).slice(0, 10)
       return {
         date: d.toISOString().slice(0, 10),
         displayDate: d.toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
-        topClicks: { domain: shuffled[0].domain, value: Math.round(shuffled[0].clicks / 30 + (Math.random() - 0.5) * 200) },
-        topImpressions: { domain: shuffled[1].domain, value: Math.round(shuffled[1].impressions / 30 + (Math.random() - 0.5) * 5000) },
+        byClicks: shuffled.map((w) => ({ domain: w.domain, clicks: Math.round(w.clicks / 30 + (Math.random() - 0.5) * 200), impressions: Math.round(w.impressions / 30 + (Math.random() - 0.5) * 5000) })).sort((a, b) => b.clicks - a.clicks),
+        byImpressions: shuffled.map((w) => ({ domain: w.domain, clicks: Math.round(w.clicks / 30 + (Math.random() - 0.5) * 200), impressions: Math.round(w.impressions / 30 + (Math.random() - 0.5) * 5000) })).sort((a, b) => b.impressions - a.impressions),
       }
     })
   })()
@@ -164,59 +160,93 @@ export function DashboardView() {
         </GlassCard>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <GlassCard glow={T.glow.indigo}>
-          <SectionHeader icon={Trophy} title="Top Performers" subtitle="Best performing websites day by day" action={
-            <div style={{ display: "flex", gap: 4 }}>
-              {performerFilters.map((f) => (
-                <button
-                  key={f.days}
-                  onClick={() => setPerformerDays(f.days)}
-                  style={{
-                    padding: "4px 10px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    borderRadius: 6,
-                    border: `1px solid ${performerDays === f.days ? T.accent.indigo : T.border.subtle}`,
-                    background: performerDays === f.days ? `${T.accent.indigo}20` : "transparent",
-                    color: performerDays === f.days ? T.accent.indigo : T.text.muted,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          } />
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {topPerformers.map((day) => (
-              <div key={day.date} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${T.border.subtle}` }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: T.text.secondary, marginBottom: 8 }}>{day.displayDate}</div>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: `${T.accent.blue}10` }}>
-                    <MousePointerClick size={14} color={T.accent.blue} style={{ flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: T.text.muted }}>Most Clicks</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text.primary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{day.topClicks.domain}</div>
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: T.accent.blue, flexShrink: 0 }}>{formatNum(day.topClicks.value)}</span>
-                  </div>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: `${T.accent.purple}10` }}>
-                    <Eye size={14} color={T.accent.purple} style={{ flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: T.text.muted }}>Most Impressions</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text.primary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{day.topImpressions.domain}</div>
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: T.accent.purple, flexShrink: 0 }}>{formatNum(day.topImpressions.value)}</span>
-                  </div>
-                </div>
-              </div>
+      <GlassCard glow={T.glow.indigo}>
+        <SectionHeader icon={Trophy} title="Top Performers" subtitle="Top 10 websites per day — click a day to expand" action={
+          <div style={{ display: "flex", gap: 4 }}>
+            {performerFilters.map((f) => (
+              <button
+                key={f.days}
+                onClick={() => { setPerformerDays(f.days); setExpandedDay(null) }}
+                style={{
+                  padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 6,
+                  border: `1px solid ${performerDays === f.days ? T.accent.indigo : T.border.subtle}`,
+                  background: performerDays === f.days ? `${T.accent.indigo}20` : "transparent",
+                  color: performerDays === f.days ? T.accent.indigo : T.text.muted,
+                  cursor: "pointer", transition: "all 0.15s ease",
+                }}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
-        </GlassCard>
+        } />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {topPerformers.map((day) => {
+            const isOpen = expandedDay === day.date
+            return (
+              <div key={day.date} style={{ borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${isOpen ? T.border.medium : T.border.subtle}`, overflow: "hidden", transition: "border-color 0.15s" }}>
+                {/* Day header — always visible, clickable */}
+                <div onClick={() => setExpandedDay(isOpen ? null : day.date)}
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                  <ChevronDown size={14} color={T.text.muted} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: T.text.secondary, minWidth: 120 }}>{day.displayDate}</span>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <MousePointerClick size={12} color={T.accent.blue} />
+                      <span style={{ fontSize: 12, color: T.text.muted }}>Top:</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: T.text.primary }}>{day.byClicks[0]?.domain}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: T.accent.blue }}>{formatNum(day.byClicks[0]?.clicks || 0)}</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Eye size={12} color={T.accent.purple} />
+                      <span style={{ fontSize: 12, color: T.text.muted }}>Top:</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: T.text.primary }}>{day.byImpressions[0]?.domain}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: T.accent.purple }}>{formatNum(day.byImpressions[0]?.impressions || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Expanded: top 10 lists */}
+                {isOpen && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: "0 14px 14px" }}>
+                    {/* Top 10 by Clicks */}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                        <MousePointerClick size={13} color={T.accent.blue} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.blue, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Clicks</span>
+                      </div>
+                      {day.byClicks.map((entry, rank) => (
+                        <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: rank === 0 ? `${T.accent.blue}08` : "transparent" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: rank < 3 ? T.accent.blue : T.text.muted, width: 18, textAlign: "right" }}>{rank + 1}.</span>
+                          <span style={{ fontSize: 12, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: rank === 0 ? T.accent.blue : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.clicks)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Top 10 by Impressions */}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                        <Eye size={13} color={T.accent.purple} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.purple, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Impressions</span>
+                      </div>
+                      {day.byImpressions.map((entry, rank) => (
+                        <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: rank === 0 ? `${T.accent.purple}08` : "transparent" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: rank < 3 ? T.accent.purple : T.text.muted, width: 18, textAlign: "right" }}>{rank + 1}.</span>
+                          <span style={{ fontSize: 12, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: rank === 0 ? T.accent.purple : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.impressions)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </GlassCard>
 
-        <GlassCard>
+      <GlassCard>
           <SectionHeader icon={Target} title="Top Keywords" subtitle="Best performing keywords" />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {keywords.slice(0, 5).map((kw, i) => (
@@ -238,8 +268,7 @@ export function DashboardView() {
               </div>
             ))}
           </div>
-        </GlassCard>
-      </div>
+      </GlassCard>
     </div>
   );
 }
