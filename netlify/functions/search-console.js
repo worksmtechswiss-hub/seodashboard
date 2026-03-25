@@ -23,7 +23,7 @@ export const handler = async (event) => {
 
   const cacheStore = getStore('seo-cache')
   const today = new Date().toISOString().slice(0, 10)
-  const cacheKey = `gsc/${domain}/${today}`
+  const cacheKey = `gsc/${domain}/${today}/${dateRange}d`
 
   // Return cache if fresh and not invalidating
   if (!invalidate) {

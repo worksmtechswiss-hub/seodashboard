@@ -23,7 +23,7 @@ export const handler = async (event) => {
 
   const cacheStore = getStore('seo-cache')
   const today = new Date().toISOString().slice(0, 10)
-  const cacheKey = `gsc/${domain}/keywords/${today}`
+  const cacheKey = `gsc/${domain}/keywords/${today}/${dateRange}d`
 
   // Return cache if fresh
   const cached = await getCached(cacheStore, cacheKey, KW_TTL_MS)
