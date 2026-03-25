@@ -52,9 +52,13 @@ export function DashboardView() {
     ? mergedRows.map((r) => ({ date: r.date, value: r.impressions }))
     : mockImpressionsData.slice(-dateRange)
 
-  // Compute daily top performers — top 10 websites per day ranked by clicks & impressions
+  // Compute top performers data
+  const isYesterday = performerDays === 1
+
+  // Yesterday: per-day expandable view | Multi-day: aggregated top 10
   const topPerformers = (() => {
     const hasRealDomainData = domainResults.some((d) => d.data?.rows?.length > 0)
+
     if (hasRealDomainData) {
       const byDate = {}
       for (const dr of domainResults) {
@@ -65,27 +69,56 @@ export function DashboardView() {
           byDate[row.date].push({ domain: dr.domain, clicks: row.clicks || 0, impressions: row.impressions || 0 })
         }
       }
-      return Object.entries(byDate)
-        .sort(([a], [b]) => b.localeCompare(a))
-        .slice(0, performerDays)
-        .map(([date, entries]) => ({
-          date,
-          displayDate: new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
-          byClicks: [...entries].sort((a, b) => b.clicks - a.clicks).slice(0, 10),
-          byImpressions: [...entries].sort((a, b) => b.impressions - a.impressions).slice(0, 10),
-        }))
-    }
-    // Mock fallback
-    return Array.from({ length: performerDays }, (_, i) => {
-      const d = new Date(Date.now() - i * 86400000)
-      const shuffled = [...mockWebsites].sort(() => Math.random() - 0.5).slice(0, 10)
+
+      if (isYesterday) {
+        // Yesterday: return the most recent day with expandable top 10
+        return Object.entries(byDate)
+          .sort(([a], [b]) => b.localeCompare(a))
+          .slice(0, 1)
+          .map(([date, entries]) => ({
+            date,
+            displayDate: new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
+            byClicks: [...entries].sort((a, b) => b.clicks - a.clicks).slice(0, 10),
+            byImpressions: [...entries].sort((a, b) => b.impressions - a.impressions).slice(0, 10),
+          }))
+      }
+
+      // Multi-day: aggregate all days within range into one top 10
+      const allDays = Object.entries(byDate).sort(([a], [b]) => b.localeCompare(a)).slice(0, performerDays)
+      const totals = {}
+      for (const [, entries] of allDays) {
+        for (const e of entries) {
+          if (!totals[e.domain]) totals[e.domain] = { domain: e.domain, clicks: 0, impressions: 0 }
+          totals[e.domain].clicks += e.clicks
+          totals[e.domain].impressions += e.impressions
+        }
+      }
+      const all = Object.values(totals)
       return {
+        aggregated: true,
+        byClicks: [...all].sort((a, b) => b.clicks - a.clicks).slice(0, 10),
+        byImpressions: [...all].sort((a, b) => b.impressions - a.impressions).slice(0, 10),
+      }
+    }
+
+    // Mock fallback
+    if (isYesterday) {
+      const d = new Date(Date.now() - 86400000)
+      const shuffled = [...mockWebsites].sort(() => Math.random() - 0.5).slice(0, 10)
+      return [{
         date: d.toISOString().slice(0, 10),
         displayDate: d.toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
-        byClicks: shuffled.map((w) => ({ domain: w.domain, clicks: Math.round(w.clicks / 30 + (Math.random() - 0.5) * 200), impressions: Math.round(w.impressions / 30 + (Math.random() - 0.5) * 5000) })).sort((a, b) => b.clicks - a.clicks),
-        byImpressions: shuffled.map((w) => ({ domain: w.domain, clicks: Math.round(w.clicks / 30 + (Math.random() - 0.5) * 200), impressions: Math.round(w.impressions / 30 + (Math.random() - 0.5) * 5000) })).sort((a, b) => b.impressions - a.impressions),
-      }
-    })
+        byClicks: shuffled.map((w) => ({ domain: w.domain, clicks: Math.round(w.clicks / 30 + (Math.random() - 0.5) * 200) })).sort((a, b) => b.clicks - a.clicks),
+        byImpressions: shuffled.map((w) => ({ domain: w.domain, impressions: Math.round(w.impressions / 30 + (Math.random() - 0.5) * 5000) })).sort((a, b) => b.impressions - a.impressions),
+      }]
+    }
+    // Mock aggregated
+    const all = mockWebsites.slice(0, 10).map((w) => ({ domain: w.domain, clicks: Math.round(w.clicks * performerDays / 30), impressions: Math.round(w.impressions * performerDays / 30) }))
+    return {
+      aggregated: true,
+      byClicks: [...all].sort((a, b) => b.clicks - a.clicks),
+      byImpressions: [...all].sort((a, b) => b.impressions - a.impressions),
+    }
   })()
 
   return (
@@ -161,7 +194,7 @@ export function DashboardView() {
       </div>
 
       <GlassCard glow={T.glow.indigo}>
-        <SectionHeader icon={Trophy} title="Top Performers" subtitle="Top 10 websites per day — click a day to expand" action={
+        <SectionHeader icon={Trophy} title="Top Performers" subtitle={isYesterday ? "Click to expand top 10" : `Top 10 over the last ${performerDays} days`} action={
           <div style={{ display: "flex", gap: 4 }}>
             {performerFilters.map((f) => (
               <button
@@ -180,70 +213,98 @@ export function DashboardView() {
             ))}
           </div>
         } />
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {topPerformers.map((day) => {
-            const isOpen = expandedDay === day.date
-            return (
-              <div key={day.date} style={{ borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${isOpen ? T.border.medium : T.border.subtle}`, overflow: "hidden", transition: "border-color 0.15s" }}>
-                {/* Day header — always visible, clickable */}
-                <div onClick={() => setExpandedDay(isOpen ? null : day.date)}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                  <ChevronDown size={14} color={T.text.muted} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: T.text.secondary, minWidth: 120 }}>{day.displayDate}</span>
-                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <MousePointerClick size={12} color={T.accent.blue} />
-                      <span style={{ fontSize: 12, color: T.text.muted }}>Top:</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: T.text.primary }}>{day.byClicks[0]?.domain}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: T.accent.blue }}>{formatNum(day.byClicks[0]?.clicks || 0)}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Eye size={12} color={T.accent.purple} />
-                      <span style={{ fontSize: 12, color: T.text.muted }}>Top:</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: T.text.primary }}>{day.byImpressions[0]?.domain}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: T.accent.purple }}>{formatNum(day.byImpressions[0]?.impressions || 0)}</span>
-                    </div>
+
+        {/* Yesterday: expandable day view */}
+        {isYesterday && Array.isArray(topPerformers) && topPerformers.map((day) => {
+          const isOpen = expandedDay === day.date
+          return (
+            <div key={day.date} style={{ borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${isOpen ? T.border.medium : T.border.subtle}`, overflow: "hidden", transition: "border-color 0.15s" }}>
+              <div onClick={() => setExpandedDay(isOpen ? null : day.date)}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                <ChevronDown size={14} color={T.text.muted} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: T.text.secondary, minWidth: 120 }}>{day.displayDate}</span>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <MousePointerClick size={12} color={T.accent.blue} />
+                    <span style={{ fontSize: 12, color: T.text.muted }}>Top:</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: T.text.primary }}>{day.byClicks[0]?.domain}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: T.accent.blue }}>{formatNum(day.byClicks[0]?.clicks || 0)}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Eye size={12} color={T.accent.purple} />
+                    <span style={{ fontSize: 12, color: T.text.muted }}>Top:</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: T.text.primary }}>{day.byImpressions[0]?.domain}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: T.accent.purple }}>{formatNum(day.byImpressions[0]?.impressions || 0)}</span>
                   </div>
                 </div>
-                {/* Expanded: top 10 lists */}
-                {isOpen && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: "0 14px 14px" }}>
-                    {/* Top 10 by Clicks */}
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                        <MousePointerClick size={13} color={T.accent.blue} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.blue, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Clicks</span>
-                      </div>
-                      {day.byClicks.map((entry, rank) => (
-                        <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: rank === 0 ? `${T.accent.blue}08` : "transparent" }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: rank < 3 ? T.accent.blue : T.text.muted, width: 18, textAlign: "right" }}>{rank + 1}.</span>
-                          <span style={{ fontSize: 12, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: rank === 0 ? T.accent.blue : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.clicks)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Top 10 by Impressions */}
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                        <Eye size={13} color={T.accent.purple} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.purple, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Impressions</span>
-                      </div>
-                      {day.byImpressions.map((entry, rank) => (
-                        <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: rank === 0 ? `${T.accent.purple}08` : "transparent" }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: rank < 3 ? T.accent.purple : T.text.muted, width: 18, textAlign: "right" }}>{rank + 1}.</span>
-                          <span style={{ fontSize: 12, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: rank === 0 ? T.accent.purple : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.impressions)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-            )
-          })}
-        </div>
+              {isOpen && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: "0 14px 14px" }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                      <MousePointerClick size={13} color={T.accent.blue} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.blue, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Clicks</span>
+                    </div>
+                    {day.byClicks.map((entry, rank) => (
+                      <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: rank === 0 ? `${T.accent.blue}08` : "transparent" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: rank < 3 ? T.accent.blue : T.text.muted, width: 18, textAlign: "right" }}>{rank + 1}.</span>
+                        <span style={{ fontSize: 12, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: rank === 0 ? T.accent.blue : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.clicks)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                      <Eye size={13} color={T.accent.purple} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.purple, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Impressions</span>
+                    </div>
+                    {day.byImpressions.map((entry, rank) => (
+                      <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: rank === 0 ? `${T.accent.purple}08` : "transparent" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: rank < 3 ? T.accent.purple : T.text.muted, width: 18, textAlign: "right" }}>{rank + 1}.</span>
+                        <span style={{ fontSize: 12, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: rank === 0 ? T.accent.purple : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.impressions)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Multi-day: flat aggregated top 10 */}
+        {!isYesterday && topPerformers.aggregated && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                <MousePointerClick size={13} color={T.accent.blue} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.blue, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Clicks</span>
+              </div>
+              {topPerformers.byClicks.map((entry, rank) => (
+                <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: rank === 0 ? `${T.accent.blue}08` : "transparent" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: rank < 3 ? T.accent.blue : T.text.muted, width: 20, textAlign: "right" }}>{rank + 1}.</span>
+                  <span style={{ fontSize: 13, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: rank === 0 ? T.accent.blue : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.clicks)}</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                <Eye size={13} color={T.accent.purple} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.accent.purple, textTransform: "uppercase", letterSpacing: "0.06em" }}>Top 10 Impressions</span>
+              </div>
+              {topPerformers.byImpressions.map((entry, rank) => (
+                <div key={entry.domain} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: rank === 0 ? `${T.accent.purple}08` : "transparent" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: rank < 3 ? T.accent.purple : T.text.muted, width: 20, textAlign: "right" }}>{rank + 1}.</span>
+                  <span style={{ fontSize: 13, fontWeight: rank === 0 ? 600 : 400, color: T.text.primary, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.domain}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: rank === 0 ? T.accent.purple : T.text.secondary, flexShrink: 0 }}>{formatNum(entry.impressions)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </GlassCard>
 
       <GlassCard>
