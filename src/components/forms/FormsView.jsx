@@ -10,13 +10,18 @@ export function FormsView() {
   const statusVariant = { new: "default", contacted: "warning", converted: "success" }
   const COLORS = [T.accent.indigo, T.accent.blue, T.accent.cyan, T.accent.emerald, T.accent.amber, T.accent.purple]
 
+  const totalCount = formSubmissions?.length || 0
+  const newCount = formSubmissions?.filter((s) => s.status === 'new').length || 0
+  const contactedCount = formSubmissions?.filter((s) => s.status === 'contacted').length || 0
+  const convertedCount = formSubmissions?.filter((s) => s.status === 'converted').length || 0
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        <MetricCard icon={Send} label="Total Submissions" value="705" change={18.3} changeType="up" color={T.accent.indigo} />
-        <MetricCard icon={Clock} label="New (Unread)" value="12" color={T.accent.amber} subtitle="Awaiting response" />
-        <MetricCard icon={Users} label="Contacted" value="48" color={T.accent.blue} subtitle="In pipeline" />
-        <MetricCard icon={CheckCircle} label="Converted" value="23" change={32} changeType="up" color={T.accent.emerald} subtitle="This month" />
+        <MetricCard icon={Send} label="Total Submissions" value={totalCount} color={T.accent.indigo} />
+        <MetricCard icon={Clock} label="New (Unread)" value={newCount} color={T.accent.amber} subtitle="Awaiting response" />
+        <MetricCard icon={Users} label="Contacted" value={contactedCount} color={T.accent.blue} subtitle="In pipeline" />
+        <MetricCard icon={CheckCircle} label="Converted" value={convertedCount} color={T.accent.emerald} subtitle="This month" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <GlassCard>
