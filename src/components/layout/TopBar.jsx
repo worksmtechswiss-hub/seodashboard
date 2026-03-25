@@ -1,11 +1,26 @@
+import { useState, useRef, useEffect } from 'react'
 import { Search, Calendar, ChevronDown, Bell, Settings } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { T } from '../../utils/constants'
-import { useAppStore } from '../../store/app-store'
+import { useAppStore, dateRangeOptions } from '../../store/app-store'
 import { checkAuthStatus, redirectToLogin } from '../../utils/auth'
 
 export function TopBar() {
-  const { searchQuery, setSearchQuery } = useAppStore()
+  const { searchQuery, setSearchQuery, dateRange, setDateRange } = useAppStore()
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false)
+  const dropdownRef = useRef(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!dateDropdownOpen) return
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDateDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [dateDropdownOpen])
+
+  const activeDateLabel = dateRangeOptions.find((o) => o.days === dateRange)?.label || 'Last 30 Days'
   const { data: authenticated = false } = useQuery({
     queryKey: ['auth-status'],
     queryFn: checkAuthStatus,
@@ -40,16 +55,50 @@ export function TopBar() {
         />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '8px 14px', borderRadius: 10,
-          background: T.bg.elevated, border: `1px solid ${T.border.subtle}`,
-          color: T.text.secondary, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-        }}>
-          <Calendar size={14} />
-          Last 30 days
-          <ChevronDown size={13} />
-        </button>
+        <div ref={dropdownRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setDateDropdownOpen((v) => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 10,
+              background: T.bg.elevated, border: `1px solid ${dateDropdownOpen ? T.accent.indigo : T.border.subtle}`,
+              color: T.text.secondary, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              transition: 'border-color 0.15s ease',
+            }}
+          >
+            <Calendar size={14} />
+            {activeDateLabel}
+            <ChevronDown size={13} style={{ transform: dateDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+          </button>
+          {dateDropdownOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+              background: T.bg.card, border: `1px solid ${T.border.medium}`,
+              borderRadius: 10, padding: 4, minWidth: 170, zIndex: 100,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              backdropFilter: 'blur(16px)',
+            }}>
+              {dateRangeOptions.map((opt) => (
+                <button
+                  key={opt.days}
+                  onClick={() => { setDateRange(opt.days); setDateDropdownOpen(false) }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left',
+                    padding: '8px 12px', borderRadius: 7, fontSize: 12, fontWeight: 500,
+                    border: 'none', cursor: 'pointer',
+                    background: dateRange === opt.days ? `${T.accent.indigo}20` : 'transparent',
+                    color: dateRange === opt.days ? T.accent.indigo : T.text.secondary,
+                    transition: 'background 0.1s ease',
+                  }}
+                  onMouseEnter={(e) => { if (dateRange !== opt.days) e.target.style.background = T.bg.hover }}
+                  onMouseLeave={(e) => { if (dateRange !== opt.days) e.target.style.background = 'transparent' }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button style={{
           width: 38, height: 38, borderRadius: 10,
           background: T.bg.elevated, border: `1px solid ${T.border.subtle}`,

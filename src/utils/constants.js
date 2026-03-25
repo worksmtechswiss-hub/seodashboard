@@ -42,6 +42,7 @@ export const navItems = [
   { id: 'keywords',    label: 'Keywords',    path: '/keywords' },
   { id: 'forms',       label: 'Form Leads',  path: '/forms' },
   { id: 'agents',      label: 'AI Agents',   path: '/agents' },
+  { id: 'audit',       label: 'SEO Audit',   path: '/audit' },
   { id: 'competitors', label: 'Competitors', path: '/competitors' },
   { id: 'reports',     label: 'Reports',     path: '/reports' },
 ]
@@ -52,6 +53,7 @@ export const viewTitles = {
   keywords:    { title: 'Keywords',     subtitle: 'Monitor your search rankings' },
   forms:       { title: 'Form Leads',   subtitle: 'Formspree submissions and analytics' },
   agents:      { title: 'AI Agents',    subtitle: 'Automated SEO optimization' },
+  audit:       { title: 'SEO Audit',    subtitle: 'Comprehensive website and keyword analysis' },
   competitors: { title: 'Competitors',  subtitle: 'Track your competition' },
   reports:     { title: 'Reports',      subtitle: 'Automated SEO reports' },
 }

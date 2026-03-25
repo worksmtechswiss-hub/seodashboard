@@ -55,8 +55,8 @@ export const competitors = [
   { domain: 'webmaster-pro.com', overlap: 38, keywords: 1670, avgPosition: 7.3, traffic: 72100, trend: 'stable' },
 ]
 
-export const clicksData = generateTrend(3200, 800)
-export const impressionsData = generateTrend(85000, 15000)
+export const clicksData = generateTrend(3200, 800, 365)
+export const impressionsData = generateTrend(85000, 15000, 365)
 
 export const formsByDay = [
   { day: 'Mon', count: 12 }, { day: 'Tue', count: 18 }, { day: 'Wed', count: 9 },

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Zap } from 'lucide-react'
-import { LayoutDashboard, Globe, Target, Mail, Bot, Trophy, FileText } from 'lucide-react'
+import { LayoutDashboard, Globe, Target, Mail, Bot, Trophy, FileText, ClipboardCheck } from 'lucide-react'
 import { T, navItems } from '../../utils/constants'
 import { useAppStore } from '../../store/app-store'
 import { Badge } from '../shared'
@@ -11,6 +11,7 @@ const ICONS = {
   keywords: Target,
   forms: Mail,
   agents: Bot,
+  audit: ClipboardCheck,
   competitors: Trophy,
   reports: FileText,
 }

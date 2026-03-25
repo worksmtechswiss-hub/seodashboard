@@ -1,17 +1,38 @@
-import { MousePointerClick, Eye, TrendingUp, Target, Send, Shield, Bot, CheckCircle, RefreshCw, Clock } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { MousePointerClick, Eye, TrendingUp, Target, Send, Shield, Trophy, Tag } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { T } from '../../utils/constants'
 import { formatNum } from '../../utils/formatters'
-import { clicksData as mockClicksData, impressionsData as mockImpressionsData, aiAgentActions } from '../../utils/mock-data'
+import { clicksData as mockClicksData, impressionsData as mockImpressionsData, websites as mockWebsites } from '../../utils/mock-data'
 import { GlassCard, MetricCard, SectionHeader, Badge, ChartTooltip, PositionChange } from '../shared'
 import { useSiteList } from '../../hooks/useSiteList'
 import { useMultiDomainGSC } from '../../hooks/useMultiDomainGSC'
 import { useKeywords } from '../../hooks/useKeywords'
+import { useAppStore, businessTags } from '../../store/app-store'
+
+const performerFilters = [
+  { label: 'Yesterday', days: 1 },
+  { label: 'Last 7 Days', days: 7 },
+  { label: 'Last 14 Days', days: 14 },
+  { label: 'Last 30 Days', days: 30 },
+]
 
 export function DashboardView() {
-  const { domains, isAuthenticated } = useSiteList()
-  const { totals, mergedRows, domains: domainResults } = useMultiDomainGSC(domains)
-  const { keywords } = useKeywords(domains)
+  const [performerDays, setPerformerDays] = useState(7)
+  const dateRange = useAppStore((s) => s.dateRange)
+  const activeBusinessFilter = useAppStore((s) => s.activeBusinessFilter)
+  const setActiveBusinessFilter = useAppStore((s) => s.setActiveBusinessFilter)
+  const websiteTags = useAppStore((s) => s.websiteTags)
+  const { domains: allDomains, isAuthenticated } = useSiteList()
+
+  // Filter domains by active business tag
+  const domains = useMemo(() => {
+    if (!activeBusinessFilter) return allDomains
+    return allDomains.filter((d) => websiteTags[d] === activeBusinessFilter)
+  }, [allDomains, activeBusinessFilter, websiteTags])
+
+  const { totals, mergedRows, domains: domainResults } = useMultiDomainGSC(domains, dateRange)
+  const { keywords } = useKeywords(domains, dateRange)
 
   const totalClicks = totals.clicks
   const totalImpressions = totals.impressions
@@ -21,17 +42,79 @@ export function DashboardView() {
   const healthyCount = domainResults.filter((d) => !d.isError && !d.isLoading).length
   const siteCount = domains.length
 
-  // Use real daily data for charts when available, else mock
+  // Use real daily data for charts when available, else mock (sliced to match dateRange)
   const hasRealRows = mergedRows.length > 0
   const clicksChartData = hasRealRows
     ? mergedRows.map((r) => ({ date: r.date, value: r.clicks }))
-    : mockClicksData
+    : mockClicksData.slice(-dateRange)
   const impressionsChartData = hasRealRows
     ? mergedRows.map((r) => ({ date: r.date, value: r.impressions }))
-    : mockImpressionsData
+    : mockImpressionsData.slice(-dateRange)
+
+  // Compute daily top performers (which site had the most clicks/impressions each day)
+  const topPerformers = (() => {
+    const hasRealDomainData = domainResults.some((d) => d.data?.rows?.length > 0)
+    if (hasRealDomainData) {
+      // Build a map: date → [{ domain, clicks, impressions }]
+      const byDate = {}
+      for (const dr of domainResults) {
+        if (!dr.data?.rows) continue
+        for (const row of dr.data.rows) {
+          if (!row.date) continue
+          if (!byDate[row.date]) byDate[row.date] = []
+          byDate[row.date].push({ domain: dr.domain, clicks: row.clicks || 0, impressions: row.impressions || 0 })
+        }
+      }
+      return Object.entries(byDate)
+        .sort(([a], [b]) => b.localeCompare(a))
+        .slice(0, performerDays)
+        .map(([date, entries]) => {
+          const topClicks = entries.reduce((best, e) => (e.clicks > best.clicks ? e : best), entries[0])
+          const topImpressions = entries.reduce((best, e) => (e.impressions > best.impressions ? e : best), entries[0])
+          return {
+            date,
+            displayDate: new Date(date).toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
+            topClicks: { domain: topClicks.domain, value: topClicks.clicks },
+            topImpressions: { domain: topImpressions.domain, value: topImpressions.impressions },
+          }
+        })
+    }
+    // Mock fallback: generate fake daily top performers from mock websites
+    return Array.from({ length: performerDays }, (_, i) => {
+      const d = new Date(Date.now() - i * 86400000)
+      const shuffled = [...mockWebsites].sort(() => Math.random() - 0.5)
+      return {
+        date: d.toISOString().slice(0, 10),
+        displayDate: d.toLocaleDateString('en', { month: 'short', day: 'numeric', weekday: 'short' }),
+        topClicks: { domain: shuffled[0].domain, value: Math.round(shuffled[0].clicks / 30 + (Math.random() - 0.5) * 200) },
+        topImpressions: { domain: shuffled[1].domain, value: Math.round(shuffled[1].impressions / 30 + (Math.random() - 0.5) * 5000) },
+      }
+    })
+  })()
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* Business filter */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Tag size={15} color={T.text.muted} style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: T.text.muted, marginRight: 4 }}>Business:</span>
+        {[{ label: 'All', value: null }, ...businessTags.map((t) => ({ label: t, value: t }))].map((f) => (
+          <button
+            key={f.label}
+            onClick={() => setActiveBusinessFilter(f.value)}
+            style={{
+              padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8,
+              border: `1px solid ${activeBusinessFilter === f.value ? T.accent.indigo : T.border.subtle}`,
+              background: activeBusinessFilter === f.value ? `${T.accent.indigo}20` : "transparent",
+              color: activeBusinessFilter === f.value ? T.accent.indigo : T.text.muted,
+              cursor: "pointer", transition: "all 0.15s ease",
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
         <MetricCard icon={MousePointerClick} label="Total Clicks" value={formatNum(totalClicks)} changeType="up" color={T.accent.blue} subtitle={isAuthenticated ? "GSC live data" : "Across all websites"} />
         <MetricCard icon={Eye} label="Total Impressions" value={formatNum(totalImpressions)} changeType="up" color={T.accent.purple} subtitle="Last 30 days" />
@@ -83,21 +166,51 @@ export function DashboardView() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <GlassCard glow={T.glow.indigo}>
-          <SectionHeader icon={Bot} title="AI Agent Activity" subtitle="Automated SEO optimizations" action={<Badge variant="success">3 active</Badge>} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {aiAgentActions.slice(0, 4).map((a) => (
-              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${T.border.subtle}` }}>
-                <div style={{ width: 34, height: 34, borderRadius: 8, background: a.status === "completed" ? `${T.accent.emerald}15` : a.status === "in_progress" ? `${T.accent.blue}15` : `${T.accent.amber}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {a.status === "completed" ? <CheckCircle size={16} color={T.accent.emerald} /> : a.status === "in_progress" ? <RefreshCw size={16} color={T.accent.blue} /> : <Clock size={16} color={T.accent.amber} />}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: T.text.primary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.action}</div>
-                  <div style={{ fontSize: 11, color: T.text.muted, display: "flex", gap: 8, marginTop: 2 }}>
-                    <span>{a.domain}</span>
-                    <span style={{ color: T.accent.emerald }}>{a.impact}</span>
+          <SectionHeader icon={Trophy} title="Top Performers" subtitle="Best performing websites day by day" action={
+            <div style={{ display: "flex", gap: 4 }}>
+              {performerFilters.map((f) => (
+                <button
+                  key={f.days}
+                  onClick={() => setPerformerDays(f.days)}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: `1px solid ${performerDays === f.days ? T.accent.indigo : T.border.subtle}`,
+                    background: performerDays === f.days ? `${T.accent.indigo}20` : "transparent",
+                    color: performerDays === f.days ? T.accent.indigo : T.text.muted,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          } />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {topPerformers.map((day) => (
+              <div key={day.date} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${T.border.subtle}` }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: T.text.secondary, marginBottom: 8 }}>{day.displayDate}</div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: `${T.accent.blue}10` }}>
+                    <MousePointerClick size={14} color={T.accent.blue} style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: T.text.muted }}>Most Clicks</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text.primary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{day.topClicks.domain}</div>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: T.accent.blue, flexShrink: 0 }}>{formatNum(day.topClicks.value)}</span>
+                  </div>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8, background: `${T.accent.purple}10` }}>
+                    <Eye size={14} color={T.accent.purple} style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: T.text.muted }}>Most Impressions</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text.primary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{day.topImpressions.domain}</div>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: T.accent.purple, flexShrink: 0 }}>{formatNum(day.topImpressions.value)}</span>
                   </div>
                 </div>
-                <span style={{ fontSize: 11, color: T.text.muted, flexShrink: 0 }}>{a.time}</span>
               </div>
             ))}
           </div>

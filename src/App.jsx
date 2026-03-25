@@ -5,9 +5,11 @@ import { TopBar } from './components/layout/TopBar'
 import { PageWrapper } from './components/layout/PageWrapper'
 import { DashboardView } from './components/dashboard/DashboardView'
 import { WebsitesView } from './components/websites/WebsitesView'
+import { WebsiteDetailView } from './components/websites/WebsiteDetailView'
 import { KeywordsView } from './components/keywords/KeywordsView'
 import { FormsView } from './components/forms/FormsView'
 import { AgentsView } from './components/agents/AgentsView'
+import { AuditView } from './components/audit/AuditView'
 import { CompetitorsView } from './components/competitors/CompetitorsView'
 import { ReportsView } from './components/reports/ReportsView'
 import { useAppStore } from './store/app-store'
@@ -38,9 +40,11 @@ const router = createHashRouter([
     children: [
       { index: true, element: <DashboardView /> },
       { path: 'websites', element: <WebsitesView /> },
+      { path: 'websites/:domain', element: <WebsiteDetailView /> },
       { path: 'keywords', element: <KeywordsView /> },
       { path: 'forms', element: <FormsView /> },
       { path: 'agents', element: <AgentsView /> },
+      { path: 'audit', element: <AuditView /> },
       { path: 'competitors', element: <CompetitorsView /> },
       { path: 'reports', element: <ReportsView /> },
     ],

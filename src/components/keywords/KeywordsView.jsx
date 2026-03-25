@@ -1,20 +1,33 @@
-import { useState } from 'react'
-import { Layers, Trophy, Sparkles, AlertTriangle } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Layers, Trophy, Sparkles, AlertTriangle, Tag } from 'lucide-react'
 import { T } from '../../utils/constants'
 import { formatNum } from '../../utils/formatters'
 import { GlassCard, TabButton, PositionChange } from '../shared'
 import { useSiteList } from '../../hooks/useSiteList'
 import { useKeywords } from '../../hooks/useKeywords'
+import { useAppStore, businessTags } from '../../store/app-store'
 
 export function KeywordsView() {
   const [tab, setTab] = useState("all");
+  const [tagFilter, setTagFilter] = useState(null);
+  const dateRange = useAppStore((s) => s.dateRange)
+  const websiteTags = useAppStore((s) => s.websiteTags)
   const { domains } = useSiteList()
-  const { keywords, isMockData } = useKeywords(domains)
+  const { keywords, isMockData } = useKeywords(domains, dateRange)
 
-  const filtered = tab === "all" ? keywords
-    : tab === "top3" ? keywords.filter(k => k.position <= 3)
-    : tab === "opportunity" ? keywords.filter(k => k.position > 5 && k.position <= 20)
-    : keywords.filter(k => k.position > 20);
+  // Filter by business tag first (match keyword's domain or url to tagged domains)
+  const tagFiltered = useMemo(() => {
+    if (!tagFilter) return keywords
+    return keywords.filter((kw) => {
+      const kwDomain = kw.domain || (kw.url ? kw.url.split('/')[0] : null)
+      return kwDomain && websiteTags[kwDomain] === tagFilter
+    })
+  }, [keywords, tagFilter, websiteTags])
+
+  const filtered = tab === "all" ? tagFiltered
+    : tab === "top3" ? tagFiltered.filter(k => k.position <= 3)
+    : tab === "opportunity" ? tagFiltered.filter(k => k.position > 5 && k.position <= 20)
+    : tagFiltered.filter(k => k.position > 20);
 
   const difficultyColor = (d) => d <= 40 ? T.accent.emerald : d <= 60 ? T.accent.amber : T.accent.rose;
 
@@ -25,9 +38,26 @@ export function KeywordsView() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Business tag filter */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Tag size={15} color={T.text.muted} style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: T.text.muted, marginRight: 4 }}>Business:</span>
+        {[{ label: 'All', value: null }, ...businessTags.map((t) => ({ label: t, value: t }))].map((f) => (
+          <button key={f.label} onClick={() => setTagFilter(f.value)} style={{
+            padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8,
+            border: `1px solid ${tagFilter === f.value ? T.accent.indigo : T.border.subtle}`,
+            background: tagFilter === f.value ? `${T.accent.indigo}20` : "transparent",
+            color: tagFilter === f.value ? T.accent.indigo : T.text.muted,
+            cursor: "pointer", transition: "all 0.15s ease",
+          }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <GlassCard glow={T.glow.blue} style={{ padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <TabButton active={tab === "all"} onClick={() => setTab("all")} icon={Layers}>All Keywords ({keywords.length})</TabButton>
+          <TabButton active={tab === "all"} onClick={() => setTab("all")} icon={Layers}>All Keywords ({tagFiltered.length})</TabButton>
           <TabButton active={tab === "top3"} onClick={() => setTab("top3")} icon={Trophy}>Top 3</TabButton>
           <TabButton active={tab === "opportunity"} onClick={() => setTab("opportunity")} icon={Sparkles}>Opportunities</TabButton>
           <TabButton active={tab === "low"} onClick={() => setTab("low")} icon={AlertTriangle}>Needs Work</TabButton>
